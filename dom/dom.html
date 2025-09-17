@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Lab 4 Mini IS</title>
+  <style>
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 8px; }
+    th { background: #f5f5f5; text-align: left; }
+    .error { color: red; font-size: 0.9em; }
+    .controls { display: flex; gap: .5rem; margin-bottom: .75rem; flex-wrap: wrap; }
+    form { display: grid; gap: .5rem; grid-template-columns: repeat(2, minmax(200px, 1fr)); margin: 1rem 0; }
+    form button { grid-column: 1 / -1; }
+  </style>
+</head>
+<body>
+  <h1>Mini Information System</h1>
+
+  <div class="controls">
+    <input id="q" placeholder="Search..." />
+    <select id="sortField"></select>
+    <select id="sortOrder"><option>asc</option><option>desc</option></select>
+    <button id="btnSearch">Search</button>
+    <button id="btnReset">Reset</button>
+  </div>
+
+  <table id="grid"><thead></thead><tbody></tbody></table>
+  <div id="report"></div>
+
+  <h2>Create / Edit</h2>
+  <form id="form"></form>
+  <div id="msg" class="error"></div>
+
+  <script>
+    // ======= CONFIG (student fills S and DOMAIN) =======
+    const S = 37; // <-- last two digits of your student ID
+    const DOMAIN = S % 5; // 0..4
+
+    // ======= DATA FACTORY PER DOMAIN =======
+    function seedData(S) {
+      const N = 5 + (S % 4); // 5..8
+      const list = [];
+      const pad = n => String(n).padStart(3, '0');
+
+      if (DOMAIN === 0) { // Inventory
+        for (let i = 1; i <= N; i++) {
+          list.push({
+            id: `SKU-${S}-${pad(i)}`,
+            name: `Item-${i}`,
+            category: ["Food","Tech","Home"][ (S+i) % 3 ],
+            price: 50 + (S % 7) * 10,
+            stock: 10 + i * (S % 3 + 1),
+            reorderLevel: 5 + (S % 4)
+          });
+        }
+      } else if (DOMAIN === 1) { // Library
+        for (let i = 1; i <= N; i++) {
+          list.push({
+            id: `BK-${S}-${pad(i)}`,
+            title: `Title-${i}`,
+            author: `Author-${(S+i)%10}`,
+            year: 1990 + (S % 30),
+            genre: ["Fiction","Sci-Fi","History"][ (S+i) % 3 ],
+            available: i % 2 === 0
+          });
+        }
+      } else if (DOMAIN === 2) { // Clinic
+        const pr = ["Low","Medium","High"];
+        for (let i = 1; i <= N; i++) {
+          list.push({
+            id: `PT-${S}-${pad(i)}`,
+            name: `Patient-${i}`,
+            priority: pr[(S + i) % 3],
+            age: 18 + ((S + i) % 60),
+            reason: ["Checkup","Flu","Injury"][ (S+i) % 3 ],
+            status: "Waiting"
+          });
+        }
+      } else if (DOMAIN === 3) { // Enrollment
+        for (let i = 1; i <= N; i++) {
+          list.push({
+            id: `STU-${S}-${pad(i)}`,
+            fullName: `Student-${i}`,
+            course: ["BSIT","BSCS","BSECE"][ (S+i) % 3 ],
+            yearLevel: (i % 4) + 1,
+            units: 15 + (S % 6),
+            status: "Enrolled"
+          });
+        }
+      } else { // Task Tracker
+        const pr = ["Low","Medium","High"];
+        for (let i = 1; i <= N; i++) {
+          const d = new Date(); d.setDate(d.getDate() + ((S+i)%10 - 3));
+          list.push({
+            id: `TSK-${S}-${pad(i)}`,
+            title: `Task-${i}`,
+            assignee: `User-${(S+i)%8}`,
+            dueDate: d.toISOString().slice(0,10),
+            priority: pr[(S + i) % 3],
+            completed: false
+          });
+        }
+      }
+      return list;
+    }
+
+    // ======= DATA & STATE =======
+    let data = JSON.parse(localStorage.getItem('lab4_'+S)) || seedData(S);
+    let editingId = null;
+
+    function save() { localStorage.setItem('lab4_'+S, JSON.stringify(data)); }
+
+    // ======= CRUD =======
+    function createRecord(obj) {
+      validate(obj, true);
+      data.push(obj);
+      save();
+    }
+
+    function readRecord(id) { return data.find(r => r.id === id) || null; }
+
+    function updateRecord(id, patch) {
+      const idx = data.findIndex(r => r.id === id);
+      if (idx === -1) throw new Error("Record not found");
+      const merged = {...data[idx], ...patch};
+      validate(merged, false);
+      data[idx] = merged;
+      save();
+    }
+
+    function deleteRecord(id) {
+      const idx = data.findIndex(r => r.id === id);
+      if (idx !== -1) { data.splice(idx,1); save(); }
+    }
+
+    // ======= VALIDATION per DOMAIN =======
+    function validate(obj, isCreate) {
+      if (DOMAIN === 0) { // Inventory
+        if (obj.price < 1) throw new Error("Price must be >= 1");
+        if (obj.stock < 0) throw new Error("Stock cannot be negative");
+      } else if (DOMAIN === 1) { // Library
+        const y = Number(obj.year);
+        const thisYear = new Date().getFullYear();
+        if (y < 1980 || y > thisYear) throw new Error("Year out of range");
+        if (typeof obj.available !== 'boolean') throw new Error("Available must be boolean");
+      } else if (DOMAIN === 2) { // Clinic
+        if (!["Low","Medium","High"].includes(obj.priority)) throw new Error("Invalid priority");
+        if (!["Waiting","Serving","Done"].includes(obj.status)) throw new Error("Invalid status");
+      } else if (DOMAIN === 3) { // Enrollment
+        if (!(obj.yearLevel>=1 && obj.yearLevel<=4)) throw new Error("Year level 1..4");
+        if (!(obj.units>=3 && obj.units<=30)) throw new Error("Units 3..30");
+      } else { // Tasks
+        if (!["Low","Medium","High"].includes(obj.priority)) throw new Error("Invalid priority");
+      }
+    }
+
+    // ======= SEARCH / SORT / REPORT =======
+    function search(q) {
+      q = q.trim().toLowerCase();
+      if (!q) return [...data];
+      const pick = (DOMAIN===0) ? ['name','category']
+        : (DOMAIN===1) ? ['title','author']
+        : (DOMAIN===2) ? ['name','reason']
+        : (DOMAIN===3) ? ['fullName','course']
+        : ['title','assignee'];
+      return data.filter(r => pick.some(k => String(r[k]).toLowerCase().includes(q)));
+    }
+
+    function sortBy(arr, field, order='asc') {
+      const s = [...arr].sort((a,b)=>{
+        const va = String(a[field]).toLowerCase();
+        const vb = String(b[field]).toLowerCase();
+        if (va < vb) return -1;
+        if (va > vb) return 1;
+        return 0;
+      });
+      return order==='desc' ? s.reverse() : s;
+    }
+
+    function report(arr) {
+      if (DOMAIN===0) { // Inventory value
+        const value = arr.reduce((sum,p)=> sum + (Number(p.price)||0)*(Number(p.stock)||0), 0);
+        return `Total stock value: ${value.toFixed(2)}`;
+      } else if (DOMAIN===1) { // Availability
+        const a = arr.reduce((acc,b)=>{ acc[b.available?'available':'borrowed']++; return acc; }, {available:0, borrowed:0});
+        return `Available: ${a.available} | Borrowed: ${a.borrowed}`;
+      } else if (DOMAIN===2) { // Clinic by priority
+        const c = arr.reduce((m,p)=> (m[p.priority]=(m[p.priority]||0)+1, m), {});
+        return `Priority counts → ${JSON.stringify(c)}`;
+      } else if (DOMAIN===3) { // Units
+        const total = arr.reduce((s,x)=> s + Number(x.units||0), 0);
+        const avg = (total / arr.length).toFixed(2);
+        return `Total units: ${total} | Avg per student: ${avg}`;
+      } else { // Tasks
+        const done = arr.reduce((s,t)=> s + (t.completed?1:0), 0);
+        return `Completed: ${done}/${arr.length}`;
+      }
+    }
+
+    // ======= DOM RENDER =======
+    const $grid = document.getElementById('grid');
+    const $thead = $grid.querySelector('thead');
+    const $tbody = $grid.querySelector('tbody');
+    const $q = document.getElementById('q');
+    const $sortField = document.getElementById('sortField');
+    const $sortOrder = document.getElementById('sortOrder');
+    const $btnSearch = document.getElementById('btnSearch');
+    const $btnReset = document.getElementById('btnReset');
+    const $report = document.getElementById('report');
+    const $form = document.getElementById('form');
+    const $msg = document.getElementById('msg');
+
+    function headers() { return Object.keys(data[0] || {}); }
+
+    function renderHeaders() {
+      const cols = headers();
+      $thead.innerHTML = `<tr>${cols.map(c=>`<th>${c}</th>`).join('')}<th>Actions</th></tr>`;
+      $sortField.innerHTML = cols.map(c=>`<option value="${c}">${c}</option>`).join('');
+    }
+
+    function renderRows(arr) {
+      const cols = headers();
+      $tbody.innerHTML = arr.map(r=>`<tr>
+        ${cols.map(c=>`<td>${r[c]}</td>`).join('')}
+        <td>
+          <button data-edit="${r.id}">Edit</button>
+          <button data-del="${r.id}">Delete</button>
+        </td>
+      </tr>`).join('');
+    }
+
+    function renderReport(arr) { $report.textContent = report(arr); }
+
+    function refresh() {
+      let arr = search($q.value);
+      arr = sortBy(arr, $sortField.value || headers()[0], $sortOrder.value);
+      renderRows(arr);
+      renderReport(arr);
+    }
+
+    function buildForm() {
+      const cols = headers();
+      $form.innerHTML = cols.map(c=>{
+        const dis = (c==='id') ? 'readonly' : '';
+        return `<label>${c}<input name="${c}" ${dis}/></label>`;
+      }).join('') + `<button type="submit">${editingId ? 'Update' : 'Create'}</button>`;
+    }
+
+    $btnSearch.onclick = refresh;
+    $btnReset.onclick = ()=>{ $q.value=''; refresh(); };
+
+    $tbody.addEventListener('click', e=>{
+      if (e.target.dataset.edit) {
+        const id = e.target.dataset.edit;
+        const r = readRecord(id);
+        editingId = id;
+        buildForm();
+        headers().forEach(c => { $form.elements[c].value = r[c]; });
+      }
+      if (e.target.dataset.del) {
+        const id = e.target.dataset.del;
+        if (confirm('Delete '+id+'?')) { deleteRecord(id); refresh(); }
+      }
+    });
+
+    $form.addEventListener('submit', e=>{
+      e.preventDefault();
+      $msg.textContent = '';
+      try {
+        const obj = {};
+        headers().forEach(c => obj[c] = $form.elements[c].value || '');
+        if (DOMAIN===0 || DOMAIN===3) { // numeric coercions for some fields
+          if (obj.price) obj.price = Number(obj.price);
+          if (obj.stock) obj.stock = Number(obj.stock);
+          if (obj.units) obj.units = Number(obj.units);
+          if (obj.yearLevel) obj.yearLevel = Number(obj.yearLevel);
+        }
+        if (DOMAIN===1) { obj.available = (obj.available === 'true' || obj.available === true); }
+        if (editingId) {
+          updateRecord(editingId, obj);
+          editingId = null;
+        } else {
+          if (!obj.id) obj.id = (DOMAIN===0?'SKU':DOMAIN===1?'BK':DOMAIN===2?'PT':DOMAIN===3?'STU':'TSK') + `-${S}-X${Math.random().toString(36).slice(2,6)}`;
+          createRecord(obj);
+        }
+        buildForm();
+        refresh();
+      } catch (err) { $msg.textContent = err.message; }
+    });
+
+    // init
+    if (!data.length) data = seedData(S);
+    renderHeaders();
+    buildForm();
+    refresh();
+  </script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>JavaScript Operators</title>
+</head>
+<body>
+  <h2>JavaScript Operators Demo</h2>
+  <pre id="output"></pre>
+
+  <script>
+    // Helper function to print results in the webpage
+    function print(msg) {
+      document.getElementById("output").innerText += msg + "\n";
+    }
+
+    // 1. Arithmetic Operators
+    let a = 10, b = 3;
+    print("Arithmetic Operators:");
+    print("a + b = " + (a + b));
+    print("a - b = " + (a - b));
+    print("a * b = " + (a * b));
+    print("a / b = " + (a / b));
+    print("a % b = " + (a % b));
+    print("a ** b = " + (a ** b));
+    print("------------------------------");
+
+    // 2. Assignment Operators
+    let x = 5;
+    print("Assignment Operators:");
+    print("x = " + x);
+    x += 2; print("x += 2 → " + x);
+    x -= 1; print("x -= 1 → " + x);
+    x *= 3; print("x *= 3 → " + x);
+    x /= 2; print("x /= 2 → " + x);
+    print("------------------------------");
+
+    // 3. Comparison Operators
+    let num1 = 5, num2 = "5";
+    print("Comparison Operators:");
+    print("num1 == num2 → " + (num1 == num2));
+    print("num1 === num2 → " + (num1 === num2));
+    print("num1 != num2 → " + (num1 != num2));
+    print("num1 !== num2 → " + (num1 !== num2));
+    print("num1 > 3 → " + (num1 > 3));
+    print("num1 <= 5 → " + (num1 <= 5));
+    print("------------------------------");
+
+    // 4. Logical Operators
+    let p = true, q = false;
+    print("Logical Operators:");
+    print("p && q = " + (p && q));
+    print("p || q = " + (p || q));
+    print("!p = " + (!p));
+    print("------------------------------");
+
+    // 5. Increment / Decrement
+    let counter = 10;
+    print("Increment / Decrement:");
+    print("counter = " + counter);
+    counter++;
+    print("counter++ → " + counter);
+    counter--;
+    print("counter-- → " + counter);
+  </script>
+</body>
+</html>
